@@ -1,0 +1,38 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache & temp files
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.coverage
+coverage.xml
+
+# IDE & editor files
+.vscode/
+*.swp
+*.swo
+.idea/
+
+# Binary / large files we never want
+*.dll
+*.pyd
+*.exe
+*.so
+*.dylib
+
+# Logs and temp
+*.log
+*.tmp
+
+# macOS junk
+.DS_Store
+
+# Windows junk
+Thumbs.db
+ehthumbs.db
