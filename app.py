@@ -380,6 +380,13 @@ def _expression_data_url(expression_name: str, display_size: int) -> str | None:
     return f"data:image/png;base64,{encoded}"
 
 
+def _canvas_background_preview(image_path: str, canvas_height: int) -> Image.Image:
+    base_image = Image.open(image_path).convert("RGBA")
+    preview = Image.new("RGBA", base_image.size, (255, 252, 246, 255))
+    preview.alpha_composite(base_image)
+    return preview.resize((DISPLAY_WIDTH, canvas_height))
+
+
 def _canvas_initial_expression(image_path: str, overlay_position: dict, expression_name: str) -> tuple[dict, int]:
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
@@ -506,7 +513,7 @@ def drawing_stage_page() -> None:
         )
         left_col, right_col = st.columns([1.2, 1])
         initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
-        base_canvas_image = Image.open(image_path).convert("RGBA").resize((DISPLAY_WIDTH, canvas_height))
+        base_canvas_image = _canvas_background_preview(image_path, canvas_height)
         canvas_version = int(Path(image_path).stat().st_mtime)
 
         with left_col:
