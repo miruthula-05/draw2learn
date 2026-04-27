@@ -1,15 +1,17 @@
+import os
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
-OUTPUTS_DIR = BASE_DIR / "outputs"
+RUNTIME_DIR = Path(os.getenv("DRAW2LEARN_RUNTIME_DIR", Path.home() / ".draw2learn")).resolve()
+OUTPUTS_DIR = RUNTIME_DIR / "outputs"
 PROCESSED_DIR = OUTPUTS_DIR / "processed_drawings"
 VIDEOS_DIR = OUTPUTS_DIR / "videos"
 STATE_DIR = OUTPUTS_DIR / "state"
 GENERATED_DIR = OUTPUTS_DIR / "generated_assets"
 GENERATED_CHARACTERS_DIR = GENERATED_DIR / "characters"
 AUDIO_DIR = OUTPUTS_DIR / "audio"
-AI_CACHE_DIR = BASE_DIR / "ai_generated"
+AI_CACHE_DIR = RUNTIME_DIR / "ai_generated"
 AI_CHARACTERS_DIR = AI_CACHE_DIR / "characters"
 AI_PROMPTS_DIR = AI_CACHE_DIR / "prompts"
 DEFAULT_CHARACTERS_DIR = BASE_DIR / "default_characters"
@@ -20,6 +22,7 @@ PROJECT_STATE_FILE = STATE_DIR / "project_state.json"
 
 
 for directory in (
+    RUNTIME_DIR,
     OUTPUTS_DIR,
     PROCESSED_DIR,
     VIDEOS_DIR,
