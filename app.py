@@ -444,6 +444,11 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     }
     return sticker, display_height
 
+def _canvas_display_height(image_path: str) -> int:
+    base_image = Image.open(image_path)
+    return int(base_image.height * (DISPLAY_WIDTH / base_image.width))
+
+
 def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
@@ -491,9 +496,11 @@ def drawing_stage_page() -> None:
     if background_objects:
         st.info(f"These are part of the scene background, so children do not need to draw them: {', '.join(background_objects)}")
 
-    action_col_1 = st.container()
-    with action_col_1:
-        if st.button("Process Drawings", type="primary", width="stretch"):
+    if st.button("Process Drawings", type="primary", width="stretch"):
+        if not uploads:
+            st.warning("Upload at least one drawing before processing.")
+        else:
+            processed_any = False
             for obj, uploaded in uploads.items():
                 try:
                     processed_path = process_uploaded_drawing(uploaded, obj)
@@ -501,11 +508,18 @@ def drawing_stage_page() -> None:
                     st.session_state.overlay_positions.setdefault(obj, DEFAULT_POSITION.copy())
                     st.session_state.canvas_drawings.pop(obj, None)
                     st.session_state.pending_overlay_positions.pop(obj, None)
+                    processed_any = True
                 except Exception as exc:
                     st.error(f"Could not process {obj}: {exc}")
-            st.success("Drawings are ready for placement.")
+            if processed_any:
+                st.success("Drawings are ready for placement.")
+
     expression_names = available_expression_names(EXPRESSIONS_DIR)
-    preview_expression = st.selectbox("Expression style for placement preview", expression_names, index=expression_names.index("happy") if "happy" in expression_names else 0)
+    preview_expression = st.selectbox(
+        "Expression style for placement preview",
+        expression_names,
+        index=expression_names.index("happy") if "happy" in expression_names else 0,
+    )
     if st.session_state.get("canvas_expression_name") != preview_expression:
         st.session_state.canvas_drawings = {}
         st.session_state.canvas_expression_name = preview_expression
@@ -529,53 +543,67 @@ def drawing_stage_page() -> None:
         )
         image_path = st.session_state.processed_drawings[active_object]
         st.subheader(active_object)
-        st.caption("Drag and resize the expression sticker, then click OK to fix the position.")
+        st.caption("Drag and resize the expression sticker. The preview updates as you move it, then click OK to save the current position.")
+
         current_position = st.session_state.pending_overlay_positions.get(
             active_object,
             st.session_state.overlay_positions.setdefault(active_object, DEFAULT_POSITION.copy()),
         )
-        left_col, right_col = st.columns([1.2, 1])
-        initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
+        canvas_height = _canvas_display_height(image_path)
+        initial_drawing = st.session_state.canvas_drawings.get(active_object)
+        if not initial_drawing:
+            initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
         canvas_version = int(Path(image_path).stat().st_mtime)
 
+        left_col, right_col = st.columns([1.2, 1])
         with left_col:
-            with st.form(key=f"placement_form_{active_object}_{preview_expression}"):
-                canvas_result = st_canvas(
-                    fill_color="rgba(255, 212, 120, 0.18)",
-                    stroke_width=4,
-                    stroke_color="#ff8eb1",
-                    background_color="#fffcf6",
-                    update_streamlit=True,
-                    height=canvas_height,
-                    width=DISPLAY_WIDTH,
-                    drawing_mode="transform",
-                    initial_drawing=initial_drawing,
-                    display_toolbar=False,
-                    key=f"canvas_{active_object}_{preview_expression}_{canvas_version}",
-                )
-                save_position = st.form_submit_button(f"OK for {active_object}", width="stretch")
-                if save_position:
-                    confirmed_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
-                    if confirmed_position:
-                        st.session_state.overlay_positions[active_object] = confirmed_position
-                        st.session_state.pending_overlay_positions.pop(active_object, None)
-                        st.success(f"{active_object} expression position saved.")
-                    else:
-                        st.info("Drag the expression and then click OK.")
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 212, 120, 0.18)",
+                stroke_width=4,
+                stroke_color="#ff8eb1",
+                background_color="#fffcf6",
+                update_streamlit=True,
+                height=canvas_height,
+                width=DISPLAY_WIDTH,
+                drawing_mode="transform",
+                initial_drawing=initial_drawing,
+                display_toolbar=False,
+                key=f"canvas_{active_object}_{preview_expression}_{canvas_version}",
+            )
+            live_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
+            if live_position:
+                st.session_state.pending_overlay_positions[active_object] = live_position
+
+            save_disabled = active_object not in st.session_state.pending_overlay_positions
+            if st.button(f"OK for {active_object}", key=f"save_{active_object}", width="stretch", disabled=save_disabled):
+                confirmed_position = st.session_state.pending_overlay_positions.get(active_object)
+                if confirmed_position:
+                    st.session_state.overlay_positions[active_object] = confirmed_position
+                    st.success(f"{active_object} expression position saved.")
+                else:
+                    st.info("Move the expression sticker first, then click OK.")
 
             if st.button(f"Reset {active_object}", key=f"reset_{active_object}", width="stretch"):
                 st.session_state.overlay_positions[active_object] = DEFAULT_POSITION.copy()
                 st.session_state.pending_overlay_positions.pop(active_object, None)
+                st.session_state.canvas_drawings.pop(active_object, None)
                 st.rerun()
 
         with right_col:
-            preview_position = st.session_state.overlay_positions.get(active_object, current_position)
+            preview_position = st.session_state.pending_overlay_positions.get(
+                active_object,
+                st.session_state.overlay_positions.get(active_object, current_position),
+            )
             preview_image = render_overlay_preview(
                 image_path=image_path,
                 expression_name=preview_expression,
                 overlay_position=preview_position,
             )
             st.image(preview_image, caption=f"{active_object} live preview", width="stretch")
+    elif st.session_state.processed_drawings:
+        st.info("The processed drawings on this lesson do not need expression stickers.")
+    else:
+        st.info("Upload and process a drawing to start placing expressions.")
 
     nav_left, nav_right = st.columns([1, 1])
     with nav_left:
@@ -682,5 +710,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
 
 
