@@ -373,7 +373,14 @@ def _expression_data_url(expression_name: str, display_size: int) -> str | None:
         expression_path = EXPRESSIONS_DIR / "happy.png"
         if not expression_path.exists():
             return None
-    expression = Image.open(expression_path).convert("RGBA").resize((display_size, display_size))
+    expression = Image.open(expression_path).convert("RGBA")
+    bbox = expression.getbbox()
+    if bbox:
+        expression = expression.crop(bbox)
+        padded = Image.new("RGBA", (expression.width + 16, expression.height + 16), (0, 0, 0, 0))
+        padded.alpha_composite(expression, dest=(8, 8))
+        expression = padded
+    expression = expression.resize((display_size, display_size))
     buffer = io.BytesIO()
     expression.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")

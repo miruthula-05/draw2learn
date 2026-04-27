@@ -80,7 +80,14 @@ def _load_expression(expression_name: str) -> Image.Image | None:
         expression_path = EXPRESSIONS_DIR / "happy.png"
         if not expression_path.exists():
             return None
-    return Image.open(expression_path).convert("RGBA")
+    image = Image.open(expression_path).convert("RGBA")
+    bbox = image.getbbox()
+    if not bbox:
+        return image
+    cropped = image.crop(bbox)
+    padded = Image.new("RGBA", (cropped.width + 16, cropped.height + 16), (0, 0, 0, 0))
+    padded.alpha_composite(cropped, dest=(8, 8))
+    return padded
 
 
 def _detect_head_positions(base_img: Image.Image) -> list[tuple[int, int, int]]:
