@@ -162,6 +162,7 @@ def process_uploaded_drawing(uploaded_file, object_name: str) -> str:
     cleaned = remove(image)
     cleaned_image = Image.open(io.BytesIO(cleaned)).convert("RGBA") if isinstance(cleaned, bytes) else cleaned.convert("RGBA")
     output_path = PROCESSED_DIR / f"{slugify(object_name)}.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     cleaned_image.save(output_path)
     return str(output_path)
 
@@ -324,6 +325,7 @@ def _draw_shape_character(draw: ImageDraw.ImageDraw, object_name: str) -> None:
 
 def generate_character_fallback(object_name: str) -> str:
     output_path = GENERATED_CHARACTERS_DIR / f"{slugify(object_name)}.png"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     seed_value = _seed(object_name)
     palettes = [
         ((255, 216, 178), (245, 146, 110)),

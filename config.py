@@ -1,9 +1,11 @@
 import os
+import tempfile
 from pathlib import Path
 
 
 BASE_DIR = Path(__file__).resolve().parent
-RUNTIME_DIR = Path(os.getenv("DRAW2LEARN_RUNTIME_DIR", Path.home() / ".draw2learn")).resolve()
+DEFAULT_RUNTIME_DIR = Path(tempfile.gettempdir()) / "draw2learn"
+RUNTIME_DIR = Path(os.getenv("DRAW2LEARN_RUNTIME_DIR", DEFAULT_RUNTIME_DIR)).resolve()
 OUTPUTS_DIR = RUNTIME_DIR / "outputs"
 PROCESSED_DIR = OUTPUTS_DIR / "processed_drawings"
 VIDEOS_DIR = OUTPUTS_DIR / "videos"
