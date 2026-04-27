@@ -1,47 +1,35 @@
-# AI-Powered Cinematic Lesson Video Generator
+# AI-Powered Lesson Video Generator
 
-**Internship project** – Miruthula Sri A
-**Company:** curiosense pvt ltd 
-**Period:** February - May 2026
-**Location:** Bengaluru
+Turn predefined lessons into classroom-ready videos by using children's drawings as story characters, with optional AI image hooks and narration.
 
-Turn 2nd/3rd grade lessons into short cinematic videos using children's own drawings as main animated characters.
+## What the app does
+- Shows lesson names as selection cards on the first page
+- Opens a lesson summary page with fixed lesson content and character selection
+- Lets the teacher upload drawings on a dedicated page
+- Supports drag-and-place expression positioning with a canvas tool instead of sliders
+- Uses a dedicated video generation page with progress percentage feedback
+- Uses a pastel, child-friendly interface style
 
-## Current Features (Week 1)
-- Teacher pastes lesson text
-- Basic AI suggestion of characters/objects (using NLTK)
-- Simple web interface with Streamlit
+## Project structure
+- `app.py`: Streamlit UI and workflow
+- `lessons.py`: predefined lesson content and default lesson objects
+- `lesson_parser.py`: sentence splitting, smarter object matching, emotion and setting detection
+- `media_pipeline.py`: character/background generation, scene composition, narration attachment, and video export
+- `ai_generation.py`: optional AI image hooks and prompt creation
+- `narration.py`: narration audio generation with multiple fallbacks
+- `storage.py`: project save/load helpers
+- `config.py`: shared paths for outputs and caches
 
-## Planned Features
-- Select which characters children draw
-- Upload drawings → background removal
-- Animate drawings (Meta Animated Drawings)
-- Generate missing assets (Stable Diffusion in Colab)
-- Create video script + narration (gTTS)
-- Stitch clips into final MP4 (MoviePy)
-
-## Tech Stack (so far)
-- Python 3.10+
-- Streamlit (web UI)
-- NLTK (noun extraction)
-- rembg (background removal)
-- gTTS (text-to-speech)
-- MoviePy (video editing)
-
-Heavy tasks (image/video generation) will run in Google Colab (free GPU).
-
-## How to Run (Local)
+## Setup
 ```bash
-# 1. Create virtual environment
 python -m venv venv
-.\venv\Scripts\activate     # Windows
-# source venv/bin/activate  # macOS/Linux
-
-# 2. Install libraries
-pip install streamlit pillow opencv-python nltk rembg gtts moviepy
-
-# 3. Download NLTK data (run once)
-python -c "import nltk; nltk.download('punkt'); nltk.download('averaged_perceptron_tagger')"
-
-# 4. Start the app
+.\venv\Scripts\activate
+pip install -r requirements.txt
 streamlit run app.py
+```
+
+## UI flow
+1. Lesson selection cards
+2. Lesson summary and character selection
+3. Drawing upload and drag placement
+4. Video generation with progress

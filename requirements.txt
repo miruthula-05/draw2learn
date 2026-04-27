@@ -1,0 +1,9 @@
+streamlit
+streamlit-drawable-canvas
+pillow
+numpy
+moviepy
+rembg
+onnxruntime
+openai
+gTTS

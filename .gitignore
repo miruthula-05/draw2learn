@@ -19,6 +19,14 @@ coverage.xml
 *.swo
 .idea/
 
+# Generated media and app state
+outputs/
+ai_generated/backgrounds/
+ai_generated/characters/
+ai_generated/prompts/
+*.mp4
+saved_lesson.json
+
 # Binary / large files we never want
 *.dll
 *.pyd
