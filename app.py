@@ -449,6 +449,13 @@ def _canvas_display_height(image_path: str) -> int:
     return int(base_image.height * (DISPLAY_WIDTH / base_image.width))
 
 
+def _is_uploaded_processed_drawing(image_path: str) -> bool:
+    try:
+        return Path(image_path).resolve().parent == PROCESSED_DIR.resolve()
+    except OSError:
+        return False
+
+
 def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
@@ -481,8 +488,6 @@ def drawing_stage_page() -> None:
     if not st.session_state.selected_objects:
         st.warning("Choose lesson characters first.")
         return
-
-    _generate_missing_assets_into_state()
 
     uploads = {}
     drawable_objects = [obj for obj in st.session_state.selected_objects if should_request_child_drawing(obj)]
@@ -526,11 +531,15 @@ def drawing_stage_page() -> None:
 
     preview_objects = [
         obj for obj in st.session_state.selected_objects
-        if obj in st.session_state.processed_drawings and should_apply_expression(obj)
+        if obj in st.session_state.processed_drawings
+        and _is_uploaded_processed_drawing(st.session_state.processed_drawings[obj])
+        and should_apply_expression(obj)
     ]
     non_expression_objects = [
         obj for obj in st.session_state.selected_objects
-        if obj in st.session_state.processed_drawings and not should_apply_expression(obj)
+        if obj in st.session_state.processed_drawings
+        and _is_uploaded_processed_drawing(st.session_state.processed_drawings[obj])
+        and not should_apply_expression(obj)
     ]
     if non_expression_objects:
         st.info(f"Expressions are skipped for objects: {', '.join(non_expression_objects)}")
@@ -603,7 +612,7 @@ def drawing_stage_page() -> None:
     elif st.session_state.processed_drawings:
         st.info("The processed drawings on this lesson do not need expression stickers.")
     else:
-        st.info("Upload and process a drawing to start placing expressions.")
+        st.info("Upload and process a child drawing to start placing expressions. Missing characters will be auto-created later during video generation only.")
 
     nav_left, nav_right = st.columns([1, 1])
     with nav_left:
