@@ -380,6 +380,13 @@ def _expression_data_url(expression_name: str, display_size: int) -> str | None:
     return f"data:image/png;base64,{encoded}"
 
 
+def _image_data_url(image: Image.Image) -> str:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/png;base64,{encoded}"
+
+
 def _canvas_background_preview(image_path: str, canvas_height: int) -> Image.Image:
     base_image = Image.open(image_path).convert("RGBA")
     preview = Image.new("RGBA", base_image.size, (255, 252, 246, 255))
@@ -391,6 +398,7 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
     display_height = int(base_image.height * scale)
+    preview_image = _canvas_background_preview(image_path, display_height)
     new_size = max(24, int(base_image.width * (overlay_position.get("size", 22) / 100.0)))
     overlay_x = max(0, min((base_image.width // 2 - new_size // 2) + overlay_position.get("x", 0), base_image.width - new_size))
     overlay_y = max(0, min((base_image.height // 3 - new_size // 2) + overlay_position.get("y", 0), base_image.height - new_size))
@@ -401,6 +409,20 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     sticker = {
         "version": "4.4.0",
         "objects": [
+            {
+                "type": "image",
+                "left": 0,
+                "top": 0,
+                "width": DISPLAY_WIDTH,
+                "height": display_height,
+                "scaleX": 1,
+                "scaleY": 1,
+                "src": _image_data_url(preview_image),
+                "selectable": False,
+                "evented": False,
+                "hasControls": False,
+                "hasBorders": False,
+            },
             {
                 "type": "image",
                 "left": overlay_x * scale,
@@ -422,14 +444,15 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     }
     return sticker, display_height
 
-
 def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
     objects = canvas_result.json_data.get("objects") or []
     if not objects:
         return None
-    rect = objects[0]
+    rect = next((item for item in objects if item.get("selectable", True)), None)
+    if not rect:
+        return None
     st.session_state.canvas_drawings[obj] = canvas_result.json_data
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
@@ -513,7 +536,6 @@ def drawing_stage_page() -> None:
         )
         left_col, right_col = st.columns([1.2, 1])
         initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
-        base_canvas_image = _canvas_background_preview(image_path, canvas_height)
         canvas_version = int(Path(image_path).stat().st_mtime)
 
         with left_col:
@@ -522,7 +544,7 @@ def drawing_stage_page() -> None:
                     fill_color="rgba(255, 212, 120, 0.18)",
                     stroke_width=4,
                     stroke_color="#ff8eb1",
-                    background_image=base_canvas_image,
+                    background_color="#fffcf6",
                     update_streamlit=True,
                     height=canvas_height,
                     width=DISPLAY_WIDTH,
@@ -660,3 +682,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
