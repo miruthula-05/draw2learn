@@ -201,8 +201,6 @@ def initialize_state() -> None:
     st.session_state.setdefault("processed_drawings", {})
     st.session_state.setdefault("overlay_positions", {})
     st.session_state.setdefault("canvas_drawings", {})
-    st.session_state.setdefault("canvas_seed_drawings", {})
-    st.session_state.setdefault("canvas_revisions", {})
     st.session_state.setdefault("pending_overlay_positions", {})
     st.session_state.setdefault("final_video_path", None)
     st.session_state.auto_generate_missing_drawings = True
@@ -263,8 +261,6 @@ def _select_lesson(lesson_name: str) -> None:
     st.session_state.processed_drawings = {}
     st.session_state.overlay_positions = {}
     st.session_state.canvas_drawings = {}
-    st.session_state.canvas_seed_drawings = {}
-    st.session_state.canvas_revisions = {}
     st.session_state.pending_overlay_positions = {}
     st.session_state.final_video_path = None
     clear_temporary_media()
@@ -371,61 +367,28 @@ def _canvas_initial_drawing(image_path: str, overlay_position: dict) -> tuple[di
     return rect, display_height
 
 
-def _prepared_expression_image(expression_name: str) -> Image.Image | None:
+def _expression_data_url(expression_name: str, display_size: int) -> str | None:
     expression_path = EXPRESSIONS_DIR / f"{expression_name}.png"
     if not expression_path.exists():
         expression_path = EXPRESSIONS_DIR / "happy.png"
         if not expression_path.exists():
             return None
-    expression = Image.open(expression_path).convert("RGBA")
-    bbox = expression.getbbox()
-    if not bbox:
-        return expression
-    expression = expression.crop(bbox)
-    padded = Image.new("RGBA", (expression.width + 16, expression.height + 16), (0, 0, 0, 0))
-    padded.alpha_composite(expression, dest=(8, 8))
-    return padded
-
-
-def _expression_data_url(expression_name: str, display_width: int, display_height: int) -> tuple[str | None, int, int]:
-    expression = _prepared_expression_image(expression_name)
-    if expression is None:
-        return None, 0, 0
-    display_width = max(20, display_width)
-    display_height = max(20, display_height)
-    expression = expression.resize((display_width, display_height))
+    expression = Image.open(expression_path).convert("RGBA").resize((display_size, display_size))
     buffer = io.BytesIO()
     expression.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{encoded}", display_width, display_height
-
-
-def _image_data_url(image: Image.Image) -> str:
-    buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
-    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{encoded}"
-
-
-def _canvas_background_preview(image_path: str, canvas_height: int) -> Image.Image:
-    base_image = Image.open(image_path).convert("RGBA")
-    preview = Image.new("RGBA", base_image.size, (255, 252, 246, 255))
-    preview.alpha_composite(base_image)
-    return preview.resize((DISPLAY_WIDTH, canvas_height))
 
 
 def _canvas_initial_expression(image_path: str, overlay_position: dict, expression_name: str) -> tuple[dict, int]:
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
     display_height = int(base_image.height * scale)
-    preview_image = _canvas_background_preview(image_path, display_height)
-    expression_image = _prepared_expression_image(expression_name)
-    if expression_image is None:
-        return _canvas_initial_drawing(image_path, overlay_position)
-    overlay_x, overlay_y, new_width, new_height = _resolve_expression_geometry(base_image.width, base_image.height, overlay_position, expression_name)
-    display_width = max(20, int(new_width * scale))
-    display_height_target = max(20, int(new_height * scale))
-    expression_src, display_width, display_height_px = _expression_data_url(expression_name, display_width, display_height_target)
+    new_size = max(24, int(base_image.width * (overlay_position.get("size", 22) / 100.0)))
+    overlay_x = max(0, min((base_image.width // 2 - new_size // 2) + overlay_position.get("x", 0), base_image.width - new_size))
+    overlay_y = max(0, min((base_image.height // 3 - new_size // 2) + overlay_position.get("y", 0), base_image.height - new_size))
+    display_size = max(20, int(new_size * scale))
+    expression_src = _expression_data_url(expression_name, display_size)
     if not expression_src:
         return _canvas_initial_drawing(image_path, overlay_position)
     sticker = {
@@ -433,24 +396,10 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
         "objects": [
             {
                 "type": "image",
-                "left": 0,
-                "top": 0,
-                "width": DISPLAY_WIDTH,
-                "height": display_height,
-                "scaleX": 1,
-                "scaleY": 1,
-                "src": _image_data_url(preview_image),
-                "selectable": False,
-                "evented": False,
-                "hasControls": False,
-                "hasBorders": False,
-            },
-            {
-                "type": "image",
                 "left": overlay_x * scale,
                 "top": overlay_y * scale,
-                "width": display_width,
-                "height": display_height_px,
+                "width": display_size,
+                "height": display_size,
                 "scaleX": 1,
                 "scaleY": 1,
                 "src": expression_src,
@@ -461,73 +410,31 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
                 "cornerSize": 12,
                 "hasControls": True,
                 "hasBorders": True,
-                "lockUniScaling": False,
             }
         ],
     }
     return sticker, display_height
 
-def _canvas_display_height(image_path: str) -> int:
-    base_image = Image.open(image_path)
-    return int(base_image.height * (DISPLAY_WIDTH / base_image.width))
 
-
-def _is_uploaded_processed_drawing(image_path: str) -> bool:
-    try:
-        return Path(image_path).resolve().parent == PROCESSED_DIR.resolve()
-    except OSError:
-        return False
-
-
-def _resolve_expression_geometry(base_width: int, base_height: int, overlay_position: dict, expression_name: str) -> tuple[int, int, int, int]:
-    expression_image = _prepared_expression_image(expression_name)
-    default_aspect_ratio = (expression_image.height / expression_image.width) if expression_image else 1.0
-
-    if "width_pct" in overlay_position:
-        width_pct = overlay_position.get("width_pct", overlay_position.get("size", 22))
-        height_pct = overlay_position.get("height_pct")
-        width_px = max(16, int(base_width * (width_pct / 100.0)))
-        if height_pct is not None:
-            height_px = max(16, int(base_height * (height_pct / 100.0)))
-        else:
-            height_px = max(16, int(width_px * default_aspect_ratio))
-        left_px = int(base_width * (overlay_position.get("left_pct", 50) / 100.0))
-        top_px = int(base_height * (overlay_position.get("top_pct", 33) / 100.0))
-    else:
-        width_px = max(16, int(base_width * (overlay_position.get("size", 22) / 100.0)))
-        height_px = max(16, int(width_px * default_aspect_ratio))
-        left_px = int((base_width // 2 - width_px // 2) + overlay_position.get("x", 0))
-        top_px = int((base_height // 3 - height_px // 2) + overlay_position.get("y", 0))
-
-    left_px = max(0, min(left_px, max(0, base_width - width_px)))
-    top_px = max(0, min(top_px, max(0, base_height - height_px)))
-    return left_px, top_px, width_px, height_px
-
-
-def _extract_overlay_from_canvas(obj: str, image_path: str, expression_name: str, canvas_result) -> dict | None:
+def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
     objects = canvas_result.json_data.get("objects") or []
     if not objects:
         return None
-    rect = next((item for item in objects if item.get("selectable", True)), None)
-    if not rect:
-        return None
+    rect = objects[0]
     st.session_state.canvas_drawings[obj] = canvas_result.json_data
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
     rect_width = max(1, rect.get("width", 1) * rect.get("scaleX", 1)) / scale
-    rect_height = max(1, rect.get("height", 1) * rect.get("scaleY", 1)) / scale
-    rect_left = rect.get("left", 0) / scale
-    rect_top = rect.get("top", 0) / scale
-    width_pct = max(5, min(60, (rect_width / base_image.width) * 100))
-    height_pct = max(5, min(60, (rect_height / base_image.height) * 100))
+    overlay_x = rect.get("left", 0) / scale
+    overlay_y = rect.get("top", 0) / scale
+    size_pct = max(5, min(60, int((rect_width / base_image.width) * 100)))
+    current_size = max(16, int(base_image.width * (size_pct / 100.0)))
     return {
-        "left_pct": (rect_left / base_image.width) * 100,
-        "top_pct": (rect_top / base_image.height) * 100,
-        "width_pct": width_pct,
-        "height_pct": height_pct,
-        "size": int(width_pct),
+        "x": int(overlay_x - (base_image.width // 2 - current_size // 2)),
+        "y": int(overlay_y - (base_image.height // 3 - current_size // 2)),
+        "size": size_pct,
     }
 
 
@@ -539,6 +446,8 @@ def drawing_stage_page() -> None:
     if not st.session_state.selected_objects:
         st.warning("Choose lesson characters first.")
         return
+
+    _generate_missing_assets_into_state()
 
     uploads = {}
     drawable_objects = [obj for obj in st.session_state.selected_objects if should_request_child_drawing(obj)]
@@ -552,11 +461,9 @@ def drawing_stage_page() -> None:
     if background_objects:
         st.info(f"These are part of the scene background, so children do not need to draw them: {', '.join(background_objects)}")
 
-    if st.button("Process Drawings", type="primary", width="stretch"):
-        if not uploads:
-            st.warning("Upload at least one drawing before processing.")
-        else:
-            processed_any = False
+    action_col_1 = st.container()
+    with action_col_1:
+        if st.button("Process Drawings", type="primary", width="stretch"):
             for obj, uploaded in uploads.items():
                 try:
                     processed_path = process_uploaded_drawing(uploaded, obj)
@@ -564,34 +471,22 @@ def drawing_stage_page() -> None:
                     st.session_state.overlay_positions.setdefault(obj, DEFAULT_POSITION.copy())
                     st.session_state.canvas_drawings.pop(obj, None)
                     st.session_state.pending_overlay_positions.pop(obj, None)
-                    processed_any = True
                 except Exception as exc:
                     st.error(f"Could not process {obj}: {exc}")
-            if processed_any:
-                st.success("Drawings are ready for placement.")
-
+            st.success("Drawings are ready for placement.")
     expression_names = available_expression_names(EXPRESSIONS_DIR)
-    preview_expression = st.selectbox(
-        "Expression style for placement preview",
-        expression_names,
-        index=expression_names.index("happy") if "happy" in expression_names else 0,
-    )
+    preview_expression = st.selectbox("Expression style for placement preview", expression_names, index=expression_names.index("happy") if "happy" in expression_names else 0)
     if st.session_state.get("canvas_expression_name") != preview_expression:
         st.session_state.canvas_drawings = {}
-        st.session_state.canvas_seed_drawings = {}
         st.session_state.canvas_expression_name = preview_expression
 
     preview_objects = [
         obj for obj in st.session_state.selected_objects
-        if obj in st.session_state.processed_drawings
-        and _is_uploaded_processed_drawing(st.session_state.processed_drawings[obj])
-        and should_apply_expression(obj)
+        if obj in st.session_state.processed_drawings and should_apply_expression(obj)
     ]
     non_expression_objects = [
         obj for obj in st.session_state.selected_objects
-        if obj in st.session_state.processed_drawings
-        and _is_uploaded_processed_drawing(st.session_state.processed_drawings[obj])
-        and not should_apply_expression(obj)
+        if obj in st.session_state.processed_drawings and not should_apply_expression(obj)
     ]
     if non_expression_objects:
         st.info(f"Expressions are skipped for objects: {', '.join(non_expression_objects)}")
@@ -604,75 +499,54 @@ def drawing_stage_page() -> None:
         )
         image_path = st.session_state.processed_drawings[active_object]
         st.subheader(active_object)
-        st.caption("Drag and resize the expression sticker. The preview updates as you move it, then click OK to save the current position.")
-
+        st.caption("Drag and resize the expression sticker, then click OK to fix the position.")
         current_position = st.session_state.pending_overlay_positions.get(
             active_object,
             st.session_state.overlay_positions.setdefault(active_object, DEFAULT_POSITION.copy()),
         )
-        canvas_height = _canvas_display_height(image_path)
-        canvas_version = int(Path(image_path).stat().st_mtime)
-        canvas_revision = st.session_state.canvas_revisions.get(active_object, 0)
-        canvas_key = f"canvas_{active_object}_{preview_expression}_{canvas_version}_{canvas_revision}"
-        initial_drawing = st.session_state.canvas_seed_drawings.get(canvas_key)
-        if not initial_drawing:
-            initial_drawing = st.session_state.canvas_drawings.get(active_object)
-            if not initial_drawing:
-                initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
-            st.session_state.canvas_seed_drawings[canvas_key] = initial_drawing
-
         left_col, right_col = st.columns([1.2, 1])
-        with left_col:
-            canvas_result = st_canvas(
-                fill_color="rgba(255, 212, 120, 0.18)",
-                stroke_width=4,
-                stroke_color="#ff8eb1",
-                background_color="#fffcf6",
-                update_streamlit=True,
-                height=canvas_height,
-                width=DISPLAY_WIDTH,
-                drawing_mode="transform",
-                initial_drawing=initial_drawing,
-                display_toolbar=False,
-                key=canvas_key,
-            )
-            live_position = _extract_overlay_from_canvas(active_object, image_path, preview_expression, canvas_result)
-            if live_position:
-                st.session_state.pending_overlay_positions[active_object] = live_position
+        initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
+        base_canvas_image = Image.open(image_path).convert("RGBA").resize((DISPLAY_WIDTH, canvas_height))
+        canvas_version = int(Path(image_path).stat().st_mtime)
 
-            save_disabled = active_object not in st.session_state.pending_overlay_positions
-            if st.button(f"OK for {active_object}", key=f"save_{active_object}", width="stretch", disabled=save_disabled):
-                confirmed_position = st.session_state.pending_overlay_positions.get(active_object)
-                if confirmed_position:
-                    st.session_state.overlay_positions[active_object] = confirmed_position
-                    st.session_state.canvas_drawings.pop(active_object, None)
-                    st.session_state.canvas_revisions[active_object] = st.session_state.canvas_revisions.get(active_object, 0) + 1
-                    st.rerun()
-                else:
-                    st.info("Move the expression sticker first, then click OK.")
+        with left_col:
+            with st.form(key=f"placement_form_{active_object}_{preview_expression}"):
+                canvas_result = st_canvas(
+                    fill_color="rgba(255, 212, 120, 0.18)",
+                    stroke_width=4,
+                    stroke_color="#ff8eb1",
+                    background_image=base_canvas_image,
+                    update_streamlit=True,
+                    height=canvas_height,
+                    width=DISPLAY_WIDTH,
+                    drawing_mode="transform",
+                    initial_drawing=initial_drawing,
+                    display_toolbar=False,
+                    key=f"canvas_{active_object}_{preview_expression}_{canvas_version}",
+                )
+                save_position = st.form_submit_button(f"OK for {active_object}", width="stretch")
+                if save_position:
+                    confirmed_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
+                    if confirmed_position:
+                        st.session_state.overlay_positions[active_object] = confirmed_position
+                        st.session_state.pending_overlay_positions.pop(active_object, None)
+                        st.success(f"{active_object} expression position saved.")
+                    else:
+                        st.info("Drag the expression and then click OK.")
 
             if st.button(f"Reset {active_object}", key=f"reset_{active_object}", width="stretch"):
                 st.session_state.overlay_positions[active_object] = DEFAULT_POSITION.copy()
                 st.session_state.pending_overlay_positions.pop(active_object, None)
-                st.session_state.canvas_drawings.pop(active_object, None)
-                st.session_state.canvas_revisions[active_object] = st.session_state.canvas_revisions.get(active_object, 0) + 1
                 st.rerun()
 
         with right_col:
-            preview_position = st.session_state.pending_overlay_positions.get(
-                active_object,
-                st.session_state.overlay_positions.get(active_object, current_position),
-            )
+            preview_position = st.session_state.overlay_positions.get(active_object, current_position)
             preview_image = render_overlay_preview(
                 image_path=image_path,
                 expression_name=preview_expression,
                 overlay_position=preview_position,
             )
             st.image(preview_image, caption=f"{active_object} live preview", width="stretch")
-    elif st.session_state.processed_drawings:
-        st.info("The processed drawings on this lesson do not need expression stickers.")
-    else:
-        st.info("Upload and process a child drawing to start placing expressions. Missing characters will be auto-created later during video generation only.")
 
     nav_left, nav_right = st.columns([1, 1])
     with nav_left:
@@ -755,8 +629,6 @@ def video_generation_page() -> None:
             st.session_state.processed_drawings = {}
             st.session_state.overlay_positions = {}
             st.session_state.canvas_drawings = {}
-            st.session_state.canvas_seed_drawings = {}
-            st.session_state.canvas_revisions = {}
             st.session_state.pending_overlay_positions = {}
             st.session_state.final_video_path = None
             _go_to("lesson_select")
@@ -781,7 +653,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
