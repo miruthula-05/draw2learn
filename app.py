@@ -605,7 +605,9 @@ def drawing_stage_page() -> None:
                 confirmed_position = st.session_state.pending_overlay_positions.get(active_object)
                 if confirmed_position:
                     st.session_state.overlay_positions[active_object] = confirmed_position
-                    st.success(f"{active_object} expression position saved.")
+                    st.session_state.canvas_drawings.pop(active_object, None)
+                    st.session_state.canvas_revisions[active_object] = st.session_state.canvas_revisions.get(active_object, 0) + 1
+                    st.rerun()
                 else:
                     st.info("Move the expression sticker first, then click OK.")
 
