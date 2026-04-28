@@ -148,18 +148,20 @@ def _overlay_expression(base_img: Image.Image, expression_name: str, overlay_pos
         head_positions = _detect_head_positions(frame)
         if head_positions:
             for center_x, center_y, size_hint in head_positions:
-                new_size = max(22, min(72, int(size_hint * 0.68)))
-                face = expression.resize((new_size, new_size), Image.Resampling.LANCZOS)
-                overlay_x = max(0, min(center_x - new_size // 2, width - new_size))
-                overlay_y = max(0, min(center_y - new_size // 2, height - new_size))
+                new_width = max(22, min(72, int(size_hint * 0.68)))
+                new_height = max(18, int(new_width * (expression.height / expression.width)))
+                face = expression.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                overlay_x = max(0, min(center_x - new_width // 2, width - new_width))
+                overlay_y = max(0, min(center_y - new_height // 2, height - new_height))
                 frame.alpha_composite(face, dest=(overlay_x, overlay_y))
             return frame
-    new_size = max(16, int(width * (overlay_position.get("size", 22) / 100)))
-    face = expression.resize((new_size, new_size), Image.Resampling.LANCZOS)
+    new_width = max(16, int(width * (overlay_position.get("size", 22) / 100)))
+    new_height = max(16, int(new_width * (expression.height / expression.width)))
+    face = expression.resize((new_width, new_height), Image.Resampling.LANCZOS)
     x_offset = overlay_position.get("x", 0)
     y_offset = overlay_position.get("y", 0)
-    overlay_x = max(0, min((width // 2 - new_size // 2) + x_offset, width - new_size))
-    overlay_y = max(0, min((height // 3 - new_size // 2) + y_offset, height - new_size))
+    overlay_x = max(0, min((width // 2 - new_width // 2) + x_offset, width - new_width))
+    overlay_y = max(0, min((height // 3 - new_height // 2) + y_offset, height - new_height))
     frame.alpha_composite(face, dest=(overlay_x, overlay_y))
     return frame
 

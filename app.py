@@ -371,7 +371,7 @@ def _canvas_initial_drawing(image_path: str, overlay_position: dict) -> tuple[di
     return rect, display_height
 
 
-def _expression_data_url(expression_name: str, display_size: int) -> str | None:
+def _prepared_expression_image(expression_name: str) -> Image.Image | None:
     expression_path = EXPRESSIONS_DIR / f"{expression_name}.png"
     if not expression_path.exists():
         expression_path = EXPRESSIONS_DIR / "happy.png"
@@ -379,16 +379,25 @@ def _expression_data_url(expression_name: str, display_size: int) -> str | None:
             return None
     expression = Image.open(expression_path).convert("RGBA")
     bbox = expression.getbbox()
-    if bbox:
-        expression = expression.crop(bbox)
-        padded = Image.new("RGBA", (expression.width + 16, expression.height + 16), (0, 0, 0, 0))
-        padded.alpha_composite(expression, dest=(8, 8))
-        expression = padded
-    expression = expression.resize((display_size, display_size))
+    if not bbox:
+        return expression
+    expression = expression.crop(bbox)
+    padded = Image.new("RGBA", (expression.width + 16, expression.height + 16), (0, 0, 0, 0))
+    padded.alpha_composite(expression, dest=(8, 8))
+    return padded
+
+
+def _expression_data_url(expression_name: str, display_width: int) -> tuple[str | None, int, int]:
+    expression = _prepared_expression_image(expression_name)
+    if expression is None:
+        return None, 0, 0
+    display_width = max(20, display_width)
+    display_height = max(20, int(display_width * (expression.height / expression.width)))
+    expression = expression.resize((display_width, display_height))
     buffer = io.BytesIO()
     expression.save(buffer, format="PNG")
     encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{encoded}"
+    return f"data:image/png;base64,{encoded}", display_width, display_height
 
 
 def _image_data_url(image: Image.Image) -> str:
@@ -410,11 +419,15 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     scale = DISPLAY_WIDTH / base_image.width
     display_height = int(base_image.height * scale)
     preview_image = _canvas_background_preview(image_path, display_height)
-    new_size = max(24, int(base_image.width * (overlay_position.get("size", 22) / 100.0)))
-    overlay_x = max(0, min((base_image.width // 2 - new_size // 2) + overlay_position.get("x", 0), base_image.width - new_size))
-    overlay_y = max(0, min((base_image.height // 3 - new_size // 2) + overlay_position.get("y", 0), base_image.height - new_size))
-    display_size = max(20, int(new_size * scale))
-    expression_src = _expression_data_url(expression_name, display_size)
+    new_width = max(24, int(base_image.width * (overlay_position.get("size", 22) / 100.0)))
+    expression_image = _prepared_expression_image(expression_name)
+    if expression_image is None:
+        return _canvas_initial_drawing(image_path, overlay_position)
+    new_height = max(16, int(new_width * (expression_image.height / expression_image.width)))
+    overlay_x = max(0, min((base_image.width // 2 - new_width // 2) + overlay_position.get("x", 0), base_image.width - new_width))
+    overlay_y = max(0, min((base_image.height // 3 - new_height // 2) + overlay_position.get("y", 0), base_image.height - new_height))
+    display_width = max(20, int(new_width * scale))
+    expression_src, display_width, display_height_px = _expression_data_url(expression_name, display_width)
     if not expression_src:
         return _canvas_initial_drawing(image_path, overlay_position)
     sticker = {
@@ -438,8 +451,8 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
                 "type": "image",
                 "left": overlay_x * scale,
                 "top": overlay_y * scale,
-                "width": display_size,
-                "height": display_size,
+                "width": display_width,
+                "height": display_height_px,
                 "scaleX": 1,
                 "scaleY": 1,
                 "src": expression_src,
@@ -467,7 +480,7 @@ def _is_uploaded_processed_drawing(image_path: str) -> bool:
         return False
 
 
-def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> dict | None:
+def _extract_overlay_from_canvas(obj: str, image_path: str, expression_name: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
     objects = canvas_result.json_data.get("objects") or []
@@ -483,10 +496,13 @@ def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> di
     overlay_x = rect.get("left", 0) / scale
     overlay_y = rect.get("top", 0) / scale
     size_pct = max(5, min(60, int((rect_width / base_image.width) * 100)))
-    current_size = max(16, int(base_image.width * (size_pct / 100.0)))
+    expression_image = _prepared_expression_image(expression_name)
+    aspect_ratio = (expression_image.height / expression_image.width) if expression_image else 1.0
+    current_width = max(16, int(base_image.width * (size_pct / 100.0)))
+    current_height = max(16, int(current_width * aspect_ratio))
     return {
-        "x": int(overlay_x - (base_image.width // 2 - current_size // 2)),
-        "y": int(overlay_y - (base_image.height // 3 - current_size // 2)),
+        "x": int(overlay_x - (base_image.width // 2 - current_width // 2)),
+        "y": int(overlay_y - (base_image.height // 3 - current_height // 2)),
         "size": size_pct,
     }
 
@@ -596,7 +612,7 @@ def drawing_stage_page() -> None:
                 display_toolbar=False,
                 key=canvas_key,
             )
-            live_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
+            live_position = _extract_overlay_from_canvas(active_object, image_path, preview_expression, canvas_result)
             if live_position:
                 st.session_state.pending_overlay_positions[active_object] = live_position
 
