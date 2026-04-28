@@ -157,7 +157,10 @@ def _overlay_expression(base_img: Image.Image, expression_name: str, overlay_pos
             return frame
     if "width_pct" in overlay_position:
         new_width = max(16, int(width * (overlay_position.get("width_pct", overlay_position.get("size", 22)) / 100.0)))
-        new_height = max(16, int(new_width * (expression.height / expression.width)))
+        if "height_pct" in overlay_position:
+            new_height = max(16, int(height * (overlay_position.get("height_pct", 22) / 100.0)))
+        else:
+            new_height = max(16, int(new_width * (expression.height / expression.width)))
         overlay_x = int(width * (overlay_position.get("left_pct", 50) / 100.0))
         overlay_y = int(height * (overlay_position.get("top_pct", 33) / 100.0))
         overlay_x = max(0, min(overlay_x, width - new_width))
