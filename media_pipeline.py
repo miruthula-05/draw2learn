@@ -155,13 +155,21 @@ def _overlay_expression(base_img: Image.Image, expression_name: str, overlay_pos
                 overlay_y = max(0, min(center_y - new_height // 2, height - new_height))
                 frame.alpha_composite(face, dest=(overlay_x, overlay_y))
             return frame
-    new_width = max(16, int(width * (overlay_position.get("size", 22) / 100)))
-    new_height = max(16, int(new_width * (expression.height / expression.width)))
+    if "width_pct" in overlay_position:
+        new_width = max(16, int(width * (overlay_position.get("width_pct", overlay_position.get("size", 22)) / 100.0)))
+        new_height = max(16, int(new_width * (expression.height / expression.width)))
+        overlay_x = int(width * (overlay_position.get("left_pct", 50) / 100.0))
+        overlay_y = int(height * (overlay_position.get("top_pct", 33) / 100.0))
+        overlay_x = max(0, min(overlay_x, width - new_width))
+        overlay_y = max(0, min(overlay_y, height - new_height))
+    else:
+        new_width = max(16, int(width * (overlay_position.get("size", 22) / 100)))
+        new_height = max(16, int(new_width * (expression.height / expression.width)))
+        x_offset = overlay_position.get("x", 0)
+        y_offset = overlay_position.get("y", 0)
+        overlay_x = max(0, min((width // 2 - new_width // 2) + x_offset, width - new_width))
+        overlay_y = max(0, min((height // 3 - new_height // 2) + y_offset, height - new_height))
     face = expression.resize((new_width, new_height), Image.Resampling.LANCZOS)
-    x_offset = overlay_position.get("x", 0)
-    y_offset = overlay_position.get("y", 0)
-    overlay_x = max(0, min((width // 2 - new_width // 2) + x_offset, width - new_width))
-    overlay_y = max(0, min((height // 3 - new_height // 2) + y_offset, height - new_height))
     frame.alpha_composite(face, dest=(overlay_x, overlay_y))
     return frame
 

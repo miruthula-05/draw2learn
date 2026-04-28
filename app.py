@@ -419,13 +419,10 @@ def _canvas_initial_expression(image_path: str, overlay_position: dict, expressi
     scale = DISPLAY_WIDTH / base_image.width
     display_height = int(base_image.height * scale)
     preview_image = _canvas_background_preview(image_path, display_height)
-    new_width = max(24, int(base_image.width * (overlay_position.get("size", 22) / 100.0)))
     expression_image = _prepared_expression_image(expression_name)
     if expression_image is None:
         return _canvas_initial_drawing(image_path, overlay_position)
-    new_height = max(16, int(new_width * (expression_image.height / expression_image.width)))
-    overlay_x = max(0, min((base_image.width // 2 - new_width // 2) + overlay_position.get("x", 0), base_image.width - new_width))
-    overlay_y = max(0, min((base_image.height // 3 - new_height // 2) + overlay_position.get("y", 0), base_image.height - new_height))
+    overlay_x, overlay_y, new_width, new_height = _resolve_expression_geometry(base_image.width, base_image.height, overlay_position, expression_name)
     display_width = max(20, int(new_width * scale))
     expression_src, display_width, display_height_px = _expression_data_url(expression_name, display_width)
     if not expression_src:
@@ -480,6 +477,27 @@ def _is_uploaded_processed_drawing(image_path: str) -> bool:
         return False
 
 
+def _resolve_expression_geometry(base_width: int, base_height: int, overlay_position: dict, expression_name: str) -> tuple[int, int, int, int]:
+    expression_image = _prepared_expression_image(expression_name)
+    aspect_ratio = (expression_image.height / expression_image.width) if expression_image else 1.0
+
+    if "width_pct" in overlay_position:
+        width_pct = overlay_position.get("width_pct", overlay_position.get("size", 22))
+        width_px = max(16, int(base_width * (width_pct / 100.0)))
+        height_px = max(16, int(width_px * aspect_ratio))
+        left_px = int(base_width * (overlay_position.get("left_pct", 50) / 100.0))
+        top_px = int(base_height * (overlay_position.get("top_pct", 33) / 100.0))
+    else:
+        width_px = max(16, int(base_width * (overlay_position.get("size", 22) / 100.0)))
+        height_px = max(16, int(width_px * aspect_ratio))
+        left_px = int((base_width // 2 - width_px // 2) + overlay_position.get("x", 0))
+        top_px = int((base_height // 3 - height_px // 2) + overlay_position.get("y", 0))
+
+    left_px = max(0, min(left_px, max(0, base_width - width_px)))
+    top_px = max(0, min(top_px, max(0, base_height - height_px)))
+    return left_px, top_px, width_px, height_px
+
+
 def _extract_overlay_from_canvas(obj: str, image_path: str, expression_name: str, canvas_result) -> dict | None:
     if not canvas_result or not canvas_result.json_data:
         return None
@@ -493,17 +511,14 @@ def _extract_overlay_from_canvas(obj: str, image_path: str, expression_name: str
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
     rect_width = max(1, rect.get("width", 1) * rect.get("scaleX", 1)) / scale
-    overlay_x = rect.get("left", 0) / scale
-    overlay_y = rect.get("top", 0) / scale
-    size_pct = max(5, min(60, int((rect_width / base_image.width) * 100)))
-    expression_image = _prepared_expression_image(expression_name)
-    aspect_ratio = (expression_image.height / expression_image.width) if expression_image else 1.0
-    current_width = max(16, int(base_image.width * (size_pct / 100.0)))
-    current_height = max(16, int(current_width * aspect_ratio))
+    rect_left = rect.get("left", 0) / scale
+    rect_top = rect.get("top", 0) / scale
+    width_pct = max(5, min(60, (rect_width / base_image.width) * 100))
     return {
-        "x": int(overlay_x - (base_image.width // 2 - current_width // 2)),
-        "y": int(overlay_y - (base_image.height // 3 - current_height // 2)),
-        "size": size_pct,
+        "left_pct": (rect_left / base_image.width) * 100,
+        "top_pct": (rect_top / base_image.height) * 100,
+        "width_pct": width_pct,
+        "size": int(width_pct),
     }
 
 
