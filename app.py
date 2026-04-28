@@ -201,6 +201,7 @@ def initialize_state() -> None:
     st.session_state.setdefault("processed_drawings", {})
     st.session_state.setdefault("overlay_positions", {})
     st.session_state.setdefault("canvas_drawings", {})
+    st.session_state.setdefault("canvas_seed_drawings", {})
     st.session_state.setdefault("canvas_revisions", {})
     st.session_state.setdefault("pending_overlay_positions", {})
     st.session_state.setdefault("final_video_path", None)
@@ -262,6 +263,7 @@ def _select_lesson(lesson_name: str) -> None:
     st.session_state.processed_drawings = {}
     st.session_state.overlay_positions = {}
     st.session_state.canvas_drawings = {}
+    st.session_state.canvas_seed_drawings = {}
     st.session_state.canvas_revisions = {}
     st.session_state.pending_overlay_positions = {}
     st.session_state.final_video_path = None
@@ -536,6 +538,7 @@ def drawing_stage_page() -> None:
     )
     if st.session_state.get("canvas_expression_name") != preview_expression:
         st.session_state.canvas_drawings = {}
+        st.session_state.canvas_seed_drawings = {}
         st.session_state.canvas_expression_name = preview_expression
 
     preview_objects = [
@@ -571,12 +574,12 @@ def drawing_stage_page() -> None:
         canvas_version = int(Path(image_path).stat().st_mtime)
         canvas_revision = st.session_state.canvas_revisions.get(active_object, 0)
         canvas_key = f"canvas_{active_object}_{preview_expression}_{canvas_version}_{canvas_revision}"
-        initial_drawing = None
-        if st.session_state.get("active_canvas_key") != canvas_key:
+        initial_drawing = st.session_state.canvas_seed_drawings.get(canvas_key)
+        if not initial_drawing:
             initial_drawing = st.session_state.canvas_drawings.get(active_object)
             if not initial_drawing:
                 initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
-            st.session_state.active_canvas_key = canvas_key
+            st.session_state.canvas_seed_drawings[canvas_key] = initial_drawing
 
         left_col, right_col = st.columns([1.2, 1])
         with left_col:
@@ -611,7 +614,6 @@ def drawing_stage_page() -> None:
                 st.session_state.pending_overlay_positions.pop(active_object, None)
                 st.session_state.canvas_drawings.pop(active_object, None)
                 st.session_state.canvas_revisions[active_object] = st.session_state.canvas_revisions.get(active_object, 0) + 1
-                st.session_state.active_canvas_key = None
                 st.rerun()
 
         with right_col:
@@ -711,6 +713,7 @@ def video_generation_page() -> None:
             st.session_state.processed_drawings = {}
             st.session_state.overlay_positions = {}
             st.session_state.canvas_drawings = {}
+            st.session_state.canvas_seed_drawings = {}
             st.session_state.canvas_revisions = {}
             st.session_state.pending_overlay_positions = {}
             st.session_state.final_video_path = None
