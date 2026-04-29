@@ -24,7 +24,17 @@ if not hasattr(st_image, "image_to_url"):
 
 from streamlit_drawable_canvas import st_canvas
 
-from config import AUDIO_DIR, EXPRESSIONS_DIR, GENERATED_DIR, PROJECT_STATE_FILE, PROCESSED_DIR, VIDEOS_DIR
+from config import (
+    AUDIO_DIR,
+    CAPTION_FONT_SIZE_MAX,
+    CAPTION_FONT_SIZE_MIN,
+    DEFAULT_CAPTION_FONT_SIZE,
+    EXPRESSIONS_DIR,
+    GENERATED_DIR,
+    PROJECT_STATE_FILE,
+    PROCESSED_DIR,
+    VIDEOS_DIR,
+)
 from lesson_parser import build_story_scenes, should_apply_expression, should_request_child_drawing, split_sentences
 from lessons import PREDEFINED_LESSONS
 from media_pipeline import (
@@ -41,7 +51,7 @@ DEFAULT_POSITION = {"x": 0, "y": 0, "size": 22}
 DEFAULT_LESSON_NAME = next(iter(PREDEFINED_LESSONS))
 DISPLAY_WIDTH = 460
 PAGE_ORDER = ["lesson_select", "lesson_details", "drawing_stage", "video_generation"]
-APP_VERSION = "2026-04-29-caption-refresh-1"
+APP_VERSION = "2026-04-29-caption-size-control-1"
 
 
 def apply_theme() -> None:
@@ -216,6 +226,11 @@ def initialize_state() -> None:
     st.session_state.setdefault("canvas_seeds", {})
     st.session_state.setdefault("pending_overlay_positions", {})
     st.session_state.setdefault("final_video_path", None)
+    st.session_state.setdefault("caption_font_size", saved_state.get("caption_font_size", DEFAULT_CAPTION_FONT_SIZE))
+    st.session_state.caption_font_size = max(
+        CAPTION_FONT_SIZE_MIN,
+        min(CAPTION_FONT_SIZE_MAX, int(st.session_state.caption_font_size)),
+    )
     st.session_state.auto_generate_missing_drawings = True
     st.session_state.use_ai_generated_characters = False
     st.session_state.add_narration_audio = True
@@ -230,6 +245,7 @@ def persist_project_state() -> None:
             "auto_generate_missing_drawings": st.session_state.auto_generate_missing_drawings,
             "use_ai_generated_characters": st.session_state.use_ai_generated_characters,
             "add_narration_audio": st.session_state.add_narration_audio,
+            "caption_font_size": st.session_state.caption_font_size,
         },
     )
 
@@ -650,11 +666,21 @@ def video_generation_page() -> None:
         <div class="summary-card">
             <strong style="color:#000000;">Lesson:</strong> {st.session_state.lesson_title}<br>
             <strong style="color:#000000;">Characters:</strong> {', '.join(st.session_state.selected_objects)}<br>
-            <strong style="color:#000000;">Scenes:</strong> {len(scenes)}
+            <strong style="color:#000000;">Scenes:</strong> {len(scenes)}<br>
+            <strong style="color:#000000;">Caption size:</strong> {st.session_state.caption_font_size}
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+    st.slider(
+        "Video caption size",
+        min_value=CAPTION_FONT_SIZE_MIN,
+        max_value=CAPTION_FONT_SIZE_MAX,
+        step=5,
+        key="caption_font_size",
+    )
+    persist_project_state()
 
     progress_box = st.container()
     if st.button("Generate Final Video", type="primary", width="stretch"):
@@ -683,6 +709,7 @@ def video_generation_page() -> None:
                 auto_generate_missing_drawings=st.session_state.auto_generate_missing_drawings,
                 use_ai_generated_characters=st.session_state.use_ai_generated_characters,
                 add_narration_audio=st.session_state.add_narration_audio,
+                caption_font_size=st.session_state.caption_font_size,
                 progress_callback=update_progress,
             )
         except Exception as exc:

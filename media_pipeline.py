@@ -16,7 +16,16 @@ from PIL import Image, ImageDraw, ImageFont
 from rembg import remove
 
 from ai_generation import ensure_ai_character_art
-from config import CHAPTER_BACKGROUNDS_DIR, EXPRESSIONS_DIR, GENERATED_CHARACTERS_DIR, PROCESSED_DIR, VIDEOS_DIR
+from config import (
+    CAPTION_FONT_SIZE_MAX,
+    CAPTION_FONT_SIZE_MIN,
+    CHAPTER_BACKGROUNDS_DIR,
+    DEFAULT_CAPTION_FONT_SIZE,
+    EXPRESSIONS_DIR,
+    GENERATED_CHARACTERS_DIR,
+    PROCESSED_DIR,
+    VIDEOS_DIR,
+)
 from lesson_parser import should_apply_expression
 from narration import generate_narration_audio
 
@@ -56,6 +65,25 @@ def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         except Exception:
             continue
     return ImageFont.load_default()
+
+def _clamp_caption_font_size(size: int) -> int:
+    return max(CAPTION_FONT_SIZE_MIN, min(CAPTION_FONT_SIZE_MAX, int(size)))
+
+
+def _wrap_text_for_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int) -> str:
+    lines = []
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip()
+        bbox = draw.textbbox((0, 0), candidate, font=font)
+        if current and bbox[2] - bbox[0] > max_width:
+            lines.append(current)
+            current = word
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return "\n".join(lines)
 
 
 def available_expression_names(expressions_dir: Path) -> list[str]:
@@ -894,31 +922,28 @@ def _draw_speech_bubble(frame: Image.Image, speaker_text: str, center_x: int, to
     draw.polygon(tail, fill=(255, 255, 255, 232), outline=(255, 193, 87, 255))
     draw.multiline_text((bubble_x + 17, bubble_y + 10), words, font=font, fill=(58, 48, 42), align="center", spacing=6)
 
-def _draw_caption(frame: Image.Image, sentence: str) -> None:
+def _draw_caption(frame: Image.Image, sentence: str, caption_font_size: int = DEFAULT_CAPTION_FONT_SIZE) -> None:
     draw = ImageDraw.Draw(frame)
-    words = sentence.strip()
-    if len(words) > 110:
-        midpoint = len(words) // 2
-        split_at = words.rfind(" ", 0, midpoint)
-        if split_at > 20:
-            words = words[:split_at] + "\n" + words[split_at + 1 :]
-    font = _load_font(100)
-    bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=12)
+    font_size = _clamp_caption_font_size(caption_font_size)
+    font = _load_font(font_size)
+    spacing = max(8, int(font_size * 0.12))
+    stroke_width = max(3, int(font_size * 0.05))
+    words = _wrap_text_for_width(draw, sentence.strip(), font, FRAME_SIZE[0] - 80)
+    bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=spacing)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
     x = (FRAME_SIZE[0] - text_width) / 2
-    y = FRAME_SIZE[1] - text_height - 42
+    y = max(20, FRAME_SIZE[1] - text_height - 42)
     draw.multiline_text(
         (x, y),
         words,
         font=font,
         fill=(255, 255, 255),
         align="center",
-        spacing=12,
-        stroke_width=5,
+        spacing=spacing,
+        stroke_width=stroke_width,
         stroke_fill=(0, 0, 0),
     )
-
 
 def _scene_expression(sentence: str, default_expression: str) -> str:
     lowered = sentence.lower()
@@ -939,6 +964,7 @@ def compose_scene_frame(
     overlay_positions: dict[str, dict],
     selected_objects: list[str],
     phase: float,
+    caption_font_size: int = DEFAULT_CAPTION_FONT_SIZE,
 ) -> Image.Image:
     background = _load_background_from_assets(lesson_title, scene_index)
     if background is None:
@@ -969,7 +995,7 @@ def compose_scene_frame(
                 speaker_text = _speaker_bubble_text(sentence, name)
                 asset_top = int(animated["baseline_y"] - transformed.height)
                 _draw_speech_bubble(frame, speaker_text, animated["center_x"], asset_top)
-    _draw_caption(frame, sentence)
+    _draw_caption(frame, sentence, caption_font_size)
     return frame
 
 
@@ -983,6 +1009,7 @@ def generate_lesson_video(
     auto_generate_missing_drawings: bool,
     use_ai_generated_characters: bool,
     add_narration_audio: bool,
+    caption_font_size: int = DEFAULT_CAPTION_FONT_SIZE,
     progress_callback=None,
 ) -> tuple[str, dict[str, str]]:
     asset_map = ensure_character_assets(
@@ -1011,6 +1038,7 @@ def generate_lesson_video(
             overlay_positions,
             selected_objects,
             0.0,
+            caption_font_size,
         )
         end_frame = compose_scene_frame(
             lesson_title,
@@ -1022,6 +1050,7 @@ def generate_lesson_video(
             overlay_positions,
             selected_objects,
             1.0,
+            caption_font_size,
         )
         audio_clip = None
         scene_duration = 2.6
