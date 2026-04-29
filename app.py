@@ -41,6 +41,7 @@ DEFAULT_POSITION = {"x": 0, "y": 0, "size": 22}
 DEFAULT_LESSON_NAME = next(iter(PREDEFINED_LESSONS))
 DISPLAY_WIDTH = 460
 PAGE_ORDER = ["lesson_select", "lesson_details", "drawing_stage", "video_generation"]
+APP_VERSION = "2026-04-29-caption-refresh-1"
 
 
 def apply_theme() -> None:
@@ -195,6 +196,13 @@ def initialize_state() -> None:
     if "session_media_cleared" not in st.session_state:
         clear_temporary_media()
         st.session_state.session_media_cleared = True
+
+    previous_version = st.session_state.get("app_version")
+    if previous_version and previous_version != APP_VERSION:
+        _clear_directory(VIDEOS_DIR)
+        VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+        st.session_state.final_video_path = None
+    st.session_state["app_version"] = APP_VERSION
 
     st.session_state.setdefault("current_page", "lesson_select")
     st.session_state.setdefault("lesson_name", saved_state.get("lesson_name", DEFAULT_LESSON_NAME))
@@ -712,6 +720,7 @@ def main() -> None:
     apply_theme()
     initialize_state()
 
+    st.caption(f"Build: {APP_VERSION}")
     st.markdown('<div class="page-shell">', unsafe_allow_html=True)
     if st.session_state.current_page == "lesson_select":
         lesson_cards_page()
