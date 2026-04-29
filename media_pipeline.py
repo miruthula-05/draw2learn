@@ -23,9 +23,9 @@ from narration import generate_narration_audio
 
 FRAME_SIZE = (1280, 720)
 DEFAULT_OVERLAY = {"x": 0, "y": 0, "size": 22}
-CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 44)
-CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 72)
-DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 57)
+CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 34)
+CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 57)
+DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 40)
 GROUND_Y = 610
 SUPPORTED_BACKGROUND_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 CHARACTER_HEIGHTS = {
