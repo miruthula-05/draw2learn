@@ -51,7 +51,7 @@ DEFAULT_POSITION = {"x": 0, "y": 0, "size": 22}
 DEFAULT_LESSON_NAME = next(iter(PREDEFINED_LESSONS))
 DISPLAY_WIDTH = 460
 PAGE_ORDER = ["lesson_select", "lesson_details", "drawing_stage", "video_generation"]
-APP_VERSION = "2026-04-29-caption-size-control-1"
+APP_VERSION = "2026-04-29-caption-size-control-2"
 
 
 def apply_theme() -> None:
@@ -226,6 +226,7 @@ def initialize_state() -> None:
     st.session_state.setdefault("canvas_seeds", {})
     st.session_state.setdefault("pending_overlay_positions", {})
     st.session_state.setdefault("final_video_path", None)
+    st.session_state.setdefault("generated_caption_font_size", None)
     st.session_state.setdefault("caption_font_size", saved_state.get("caption_font_size", DEFAULT_CAPTION_FONT_SIZE))
     st.session_state.caption_font_size = max(
         CAPTION_FONT_SIZE_MIN,
@@ -718,13 +719,18 @@ def video_generation_page() -> None:
 
         st.session_state.processed_drawings.update(asset_map)
         st.session_state.final_video_path = final_video_path
+        st.session_state.generated_caption_font_size = st.session_state.caption_font_size
         persist_project_state()
         update_progress(100, "Video ready")
         st.success("Lesson video generated successfully.")
 
     if st.session_state.final_video_path and Path(st.session_state.final_video_path).exists():
-        st.video(st.session_state.final_video_path)
-        st.caption(st.session_state.final_video_path)
+        generated_size = st.session_state.get('generated_caption_font_size')
+        if generated_size == st.session_state.caption_font_size:
+            st.video(st.session_state.final_video_path)
+            st.caption(st.session_state.final_video_path)
+        else:
+            st.warning('Caption size changed. Generate the final video again to apply it.')
 
     nav_left, nav_right = st.columns([1, 1])
     with nav_left:
