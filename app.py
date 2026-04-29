@@ -451,7 +451,18 @@ def _extract_overlay_from_canvas(obj: str, image_path: str, canvas_result) -> di
     objects = canvas_result.json_data.get("objects") or []
     if not objects:
         return None
-    rect = next((item for item in objects if item.get("selectable", True)), None)
+    rect = next(
+        (
+            item for item in reversed(objects)
+            if item.get("type") == "image"
+            and item.get("selectable", True)
+            and item.get("evented", True)
+            and item.get("hasControls", True)
+        ),
+        None,
+    )
+    if not rect:
+        rect = next((item for item in reversed(objects) if item.get("selectable", True)), None)
     if not rect:
         return None
     st.session_state.canvas_drawings[obj] = canvas_result.json_data
@@ -540,29 +551,33 @@ def drawing_stage_page() -> None:
         canvas_version = int(Path(image_path).stat().st_mtime)
 
         with left_col:
-            with st.form(key=f"placement_form_{active_object}_{preview_expression}"):
-                canvas_result = st_canvas(
-                    fill_color="rgba(255, 212, 120, 0.18)",
-                    stroke_width=4,
-                    stroke_color="#ff8eb1",
-                    background_color="#fffcf6",
-                    update_streamlit=True,
-                    height=canvas_height,
-                    width=DISPLAY_WIDTH,
-                    drawing_mode="transform",
-                    initial_drawing=initial_drawing,
-                    display_toolbar=False,
-                    key=f"canvas_{active_object}_{preview_expression}_{canvas_version}",
-                )
-                save_position = st.form_submit_button(f"OK for {active_object}", width="stretch")
-                if save_position:
-                    confirmed_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
-                    if confirmed_position:
-                        st.session_state.overlay_positions[active_object] = confirmed_position
-                        st.session_state.pending_overlay_positions.pop(active_object, None)
-                        st.success(f"{active_object} expression position saved.")
-                    else:
-                        st.info("Drag the expression and then click OK.")
+            canvas_result = st_canvas(
+                fill_color="rgba(255, 212, 120, 0.18)",
+                stroke_width=4,
+                stroke_color="#ff8eb1",
+                background_color="#fffcf6",
+                update_streamlit=True,
+                height=canvas_height,
+                width=DISPLAY_WIDTH,
+                drawing_mode="transform",
+                initial_drawing=initial_drawing,
+                display_toolbar=False,
+                key=f"canvas_{active_object}_{preview_expression}_{canvas_version}",
+            )
+            live_position = _extract_overlay_from_canvas(active_object, image_path, canvas_result)
+            if live_position:
+                st.session_state.pending_overlay_positions[active_object] = live_position
+
+            save_disabled = active_object not in st.session_state.pending_overlay_positions
+            if st.button(f"OK for {active_object}", key=f"save_{active_object}", width="stretch", disabled=save_disabled):
+                confirmed_position = st.session_state.pending_overlay_positions.get(active_object)
+                if confirmed_position:
+                    st.session_state.overlay_positions[active_object] = confirmed_position
+                    st.session_state.pending_overlay_positions.pop(active_object, None)
+                    st.success(f"{active_object} expression position saved.")
+                    st.rerun()
+                else:
+                    st.info("Drag the expression and then click OK.")
 
             if st.button(f"Reset {active_object}", key=f"reset_{active_object}", width="stretch"):
                 st.session_state.overlay_positions[active_object] = DEFAULT_POSITION.copy()
@@ -570,7 +585,10 @@ def drawing_stage_page() -> None:
                 st.rerun()
 
         with right_col:
-            preview_position = st.session_state.overlay_positions.get(active_object, current_position)
+            preview_position = st.session_state.pending_overlay_positions.get(
+                active_object,
+                st.session_state.overlay_positions.get(active_object, current_position),
+            )
             preview_image = render_overlay_preview(
                 image_path=image_path,
                 expression_name=preview_expression,
