@@ -46,20 +46,34 @@ CHARACTER_HEIGHTS = {
 
 FONT_CANDIDATES = (
     "arial.ttf",
+    "Arial.ttf",
+    "DejaVuSans-Bold.ttf",
     "DejaVuSans.ttf",
+    "LiberationSans-Bold.ttf",
     "LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
 )
 
 
 def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    for font_name in FONT_CANDIDATES:
+    pil_font_dir = Path(ImageFont.__file__).resolve().parent / "fonts"
+    font_candidates = list(FONT_CANDIDATES) + [
+        str(pil_font_dir / "DejaVuSans-Bold.ttf"),
+        str(pil_font_dir / "DejaVuSans.ttf"),
+    ]
+    for font_name in font_candidates:
         try:
             return ImageFont.truetype(font_name, size)
         except Exception:
             continue
-    return ImageFont.load_default()
+    try:
+        return ImageFont.load_default(size=size)
+    except TypeError:
+        return ImageFont.load_default()
+
 
 def _clamp_caption_font_size(size: int) -> int:
     return max(CAPTION_FONT_SIZE_MIN, min(CAPTION_FONT_SIZE_MAX, int(size)))
