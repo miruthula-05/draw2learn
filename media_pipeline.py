@@ -23,9 +23,9 @@ from narration import generate_narration_audio
 
 FRAME_SIZE = (1280, 720)
 DEFAULT_OVERLAY = {"x": 0, "y": 0, "size": 22}
-CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 70)
-CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 150)
-DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 100)
+CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 44)
+CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 72)
+DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 57)
 GROUND_Y = 610
 SUPPORTED_BACKGROUND_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 CHARACTER_HEIGHTS = {
@@ -933,14 +933,20 @@ def _draw_speech_bubble(frame: Image.Image, speaker_text: str, center_x: int, to
 
 def _draw_caption(frame: Image.Image, sentence: str, caption_font_size: int = DEFAULT_CAPTION_FONT_SIZE) -> None:
     draw = ImageDraw.Draw(frame)
+    max_width = FRAME_SIZE[0] - 80
+    max_height = 150
     font_size = _clamp_caption_font_size(caption_font_size)
-    font = _load_font(font_size)
-    spacing = max(8, int(font_size * 0.12))
-    stroke_width = max(3, int(font_size * 0.05))
-    words = _wrap_text_for_width(draw, sentence.strip(), font, FRAME_SIZE[0] - 80)
-    bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=spacing)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
+    while font_size >= CAPTION_FONT_SIZE_MIN:
+        font = _load_font(font_size)
+        spacing = max(6, int(font_size * 0.12))
+        words = _wrap_text_for_width(draw, sentence.strip(), font, max_width)
+        bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=spacing)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        if text_width <= max_width and text_height <= max_height:
+            break
+        font_size -= 2
+    stroke_width = max(2, int(font_size * 0.08))
     x = (FRAME_SIZE[0] - text_width) / 2
     y = max(20, FRAME_SIZE[1] - text_height - 42)
     draw.multiline_text(
