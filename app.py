@@ -201,6 +201,7 @@ def initialize_state() -> None:
     st.session_state.setdefault("processed_drawings", {})
     st.session_state.setdefault("overlay_positions", {})
     st.session_state.setdefault("canvas_drawings", {})
+    st.session_state.setdefault("canvas_seeds", {})
     st.session_state.setdefault("pending_overlay_positions", {})
     st.session_state.setdefault("final_video_path", None)
     st.session_state.auto_generate_missing_drawings = True
@@ -261,6 +262,7 @@ def _select_lesson(lesson_name: str) -> None:
     st.session_state.processed_drawings = {}
     st.session_state.overlay_positions = {}
     st.session_state.canvas_drawings = {}
+    st.session_state.canvas_seeds = {}
     st.session_state.pending_overlay_positions = {}
     st.session_state.final_video_path = None
     clear_temporary_media()
@@ -518,6 +520,7 @@ def drawing_stage_page() -> None:
                     st.session_state.processed_drawings[obj] = processed_path
                     st.session_state.overlay_positions.setdefault(obj, DEFAULT_POSITION.copy())
                     st.session_state.canvas_drawings.pop(obj, None)
+                    st.session_state.canvas_seeds.pop(obj, None)
                     st.session_state.pending_overlay_positions.pop(obj, None)
                 except Exception as exc:
                     st.error(f"Could not process {obj}: {exc}")
@@ -526,6 +529,7 @@ def drawing_stage_page() -> None:
     preview_expression = st.selectbox("Expression style for placement preview", expression_names, index=expression_names.index("happy") if "happy" in expression_names else 0)
     if st.session_state.get("canvas_expression_name") != preview_expression:
         st.session_state.canvas_drawings = {}
+        st.session_state.canvas_seeds = {}
         st.session_state.canvas_expression_name = preview_expression
 
     preview_objects = [
@@ -554,10 +558,15 @@ def drawing_stage_page() -> None:
         )
         left_col, right_col = st.columns([1.2, 1])
         canvas_height = _canvas_display_height(image_path)
-        initial_drawing = st.session_state.canvas_drawings.get(active_object)
+        canvas_version = int(Path(image_path).stat().st_mtime)
+        canvas_seed_key = f"{active_object}|{preview_expression}|{canvas_version}"
+        if st.session_state.get("active_canvas_seed_key") != canvas_seed_key:
+            st.session_state.active_canvas_seed_key = canvas_seed_key
+            st.session_state.canvas_seeds.pop(active_object, None)
+        initial_drawing = st.session_state.canvas_seeds.get(active_object)
         if not initial_drawing:
             initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
-        canvas_version = int(Path(image_path).stat().st_mtime)
+            st.session_state.canvas_seeds[active_object] = initial_drawing
 
         with left_col:
             canvas_result = st_canvas(
@@ -591,6 +600,7 @@ def drawing_stage_page() -> None:
             if st.button(f"Reset {active_object}", key=f"reset_{active_object}", width="stretch"):
                 st.session_state.overlay_positions[active_object] = DEFAULT_POSITION.copy()
                 st.session_state.canvas_drawings.pop(active_object, None)
+                st.session_state.canvas_seeds.pop(active_object, None)
                 st.session_state.pending_overlay_positions.pop(active_object, None)
                 st.rerun()
 
@@ -687,6 +697,7 @@ def video_generation_page() -> None:
             st.session_state.processed_drawings = {}
             st.session_state.overlay_positions = {}
             st.session_state.canvas_drawings = {}
+            st.session_state.canvas_seeds = {}
             st.session_state.pending_overlay_positions = {}
             st.session_state.final_video_path = None
             _go_to("lesson_select")
