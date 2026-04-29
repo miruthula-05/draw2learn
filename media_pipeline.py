@@ -895,16 +895,29 @@ def _draw_caption(frame: Image.Image, sentence: str) -> None:
     bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=10)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
-    x = (FRAME_SIZE[0] - text_width) / 2
-    y = int(FRAME_SIZE[1] * 0.79 - text_height / 2)
+    band_padding_x = 28
+    band_padding_y = 18
+    band_width = min(FRAME_SIZE[0] - 80, int(text_width + band_padding_x * 2))
+    band_height = int(text_height + band_padding_y * 2)
+    band_x = int((FRAME_SIZE[0] - band_width) / 2)
+    band_y = FRAME_SIZE[1] - band_height - 36
+    text_x = int((FRAME_SIZE[0] - text_width) / 2)
+    text_y = int(band_y + band_padding_y - bbox[1])
+    draw.rounded_rectangle(
+        (band_x, band_y, band_x + band_width, band_y + band_height),
+        radius=24,
+        fill=(18, 18, 18, 210),
+        outline=(255, 255, 255, 85),
+        width=2,
+    )
     draw.multiline_text(
-        (x, y),
+        (text_x, text_y),
         words,
         font=font,
         fill=(255, 255, 255),
         align="center",
         spacing=10,
-        stroke_width=4,
+        stroke_width=2,
         stroke_fill=(0, 0, 0),
     )
 
