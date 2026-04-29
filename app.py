@@ -42,7 +42,7 @@ DEFAULT_POSITION = {"x": 0, "y": 0, "size": 22}
 DEFAULT_LESSON_NAME = next(iter(PREDEFINED_LESSONS))
 DISPLAY_WIDTH = 460
 PAGE_ORDER = ["lesson_select", "lesson_details", "drawing_stage", "video_generation"]
-APP_VERSION = "2026-04-29-caption-size-control-3"
+APP_VERSION = "2026-04-29-caption-size-control-4"
 CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 70)
 CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 150)
 DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 100)
@@ -244,9 +244,13 @@ def persist_project_state() -> None:
     )
 
 
+def _clear_generated_video_for_caption_change() -> None:
+    st.session_state.final_video_path = None
+    st.session_state.generated_caption_font_size = None
+
+
 def _go_to(page_name: str) -> None:
     st.session_state.current_page = page_name
-
 
 def _step_progress() -> None:
     labels = {
@@ -673,6 +677,7 @@ def video_generation_page() -> None:
         max_value=CAPTION_FONT_SIZE_MAX,
         step=5,
         key="caption_font_size",
+        on_change=_clear_generated_video_for_caption_change,
     )
     persist_project_state()
 
@@ -690,7 +695,7 @@ def video_generation_page() -> None:
             for obj, path in st.session_state.processed_drawings.items()
             if Path(path).exists()
         }
-        update_progress(5, "Preparing assets")
+        update_progress(5, f"Preparing assets with caption size {st.session_state.caption_font_size}")
 
         try:
             final_video_path, asset_map = generate_lesson_video(
@@ -715,7 +720,7 @@ def video_generation_page() -> None:
         st.session_state.generated_caption_font_size = st.session_state.caption_font_size
         persist_project_state()
         update_progress(100, "Video ready")
-        st.success("Lesson video generated successfully.")
+        st.success(f"Lesson video generated successfully with caption size {st.session_state.caption_font_size}.")
 
     if st.session_state.final_video_path and Path(st.session_state.final_video_path).exists():
         generated_size = st.session_state.get('generated_caption_font_size')

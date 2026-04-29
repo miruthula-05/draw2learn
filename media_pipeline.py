@@ -1069,7 +1069,8 @@ def generate_lesson_video(
     if progress_callback:
         progress_callback(84, "Stitching video")
     final_clip = concatenate_videoclips(clips, method="chain")
-    output_path = VIDEOS_DIR / f"{slugify(lesson_title)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
+    caption_size = _clamp_caption_font_size(caption_font_size)
+    output_path = VIDEOS_DIR / f"{slugify(lesson_title)}_caption_{caption_size}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
     _write_videofile(final_clip, str(output_path))
 
     if progress_callback:
