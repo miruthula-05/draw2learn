@@ -24,17 +24,8 @@ if not hasattr(st_image, "image_to_url"):
 
 from streamlit_drawable_canvas import st_canvas
 
-from config import (
-    AUDIO_DIR,
-    CAPTION_FONT_SIZE_MAX,
-    CAPTION_FONT_SIZE_MIN,
-    DEFAULT_CAPTION_FONT_SIZE,
-    EXPRESSIONS_DIR,
-    GENERATED_DIR,
-    PROJECT_STATE_FILE,
-    PROCESSED_DIR,
-    VIDEOS_DIR,
-)
+import config
+from config import AUDIO_DIR, EXPRESSIONS_DIR, GENERATED_DIR, PROJECT_STATE_FILE, PROCESSED_DIR, VIDEOS_DIR
 from lesson_parser import build_story_scenes, should_apply_expression, should_request_child_drawing, split_sentences
 from lessons import PREDEFINED_LESSONS
 from media_pipeline import (
@@ -51,8 +42,10 @@ DEFAULT_POSITION = {"x": 0, "y": 0, "size": 22}
 DEFAULT_LESSON_NAME = next(iter(PREDEFINED_LESSONS))
 DISPLAY_WIDTH = 460
 PAGE_ORDER = ["lesson_select", "lesson_details", "drawing_stage", "video_generation"]
-APP_VERSION = "2026-04-29-caption-size-control-2"
-
+APP_VERSION = "2026-04-29-caption-size-control-3"
+CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 70)
+CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 150)
+DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 100)
 
 def apply_theme() -> None:
     st.markdown(

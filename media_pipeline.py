@@ -16,21 +16,16 @@ from PIL import Image, ImageDraw, ImageFont
 from rembg import remove
 
 from ai_generation import ensure_ai_character_art
-from config import (
-    CAPTION_FONT_SIZE_MAX,
-    CAPTION_FONT_SIZE_MIN,
-    CHAPTER_BACKGROUNDS_DIR,
-    DEFAULT_CAPTION_FONT_SIZE,
-    EXPRESSIONS_DIR,
-    GENERATED_CHARACTERS_DIR,
-    PROCESSED_DIR,
-    VIDEOS_DIR,
-)
+import config
+from config import CHAPTER_BACKGROUNDS_DIR, EXPRESSIONS_DIR, GENERATED_CHARACTERS_DIR, PROCESSED_DIR, VIDEOS_DIR
 from lesson_parser import should_apply_expression
 from narration import generate_narration_audio
 
 FRAME_SIZE = (1280, 720)
 DEFAULT_OVERLAY = {"x": 0, "y": 0, "size": 22}
+CAPTION_FONT_SIZE_MIN = getattr(config, "CAPTION_FONT_SIZE_MIN", 70)
+CAPTION_FONT_SIZE_MAX = getattr(config, "CAPTION_FONT_SIZE_MAX", 150)
+DEFAULT_CAPTION_FONT_SIZE = getattr(config, "DEFAULT_CAPTION_FONT_SIZE", 100)
 GROUND_Y = 610
 SUPPORTED_BACKGROUND_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
 CHARACTER_HEIGHTS = {
