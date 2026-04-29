@@ -94,6 +94,8 @@ def should_apply_expression(object_name: str) -> bool:
     tokens = [token for token in _tokenize(object_name) if token not in STOPWORDS]
     if not tokens:
         return False
+    if any(token in {"neighbour", "neighbours", "neighbor", "neighbors"} for token in tokens):
+        return False
     if any(token in NON_CHARACTER_OBJECT_HINTS for token in tokens):
         return False
     if any(token in CHARACTER_HINTS for token in tokens):

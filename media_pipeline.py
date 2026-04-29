@@ -889,7 +889,7 @@ def _draw_caption(frame: Image.Image, sentence: str) -> None:
         if split_at > 20:
             words = words[:split_at] + "\n" + words[split_at + 1 :]
     try:
-        font = ImageFont.truetype("arial.ttf", 42)
+        font = ImageFont.truetype("arial.ttf", 50)
     except Exception:
         font = ImageFont.load_default()
     bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=10)

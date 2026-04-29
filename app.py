@@ -145,6 +145,10 @@ def apply_theme() -> None:
         div[data-testid="stMultiSelect"] div[role="combobox"] {
             color: #000000 !important;
         }
+        .stCaption, .stCaption p {
+            font-size: 1rem !important;
+            line-height: 1.5;
+        }
         div[data-testid="stRadio"] {
             display: none !important;
         }
