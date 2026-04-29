@@ -40,6 +40,23 @@ CHARACTER_HEIGHTS = {
     "neighbour": 300,
 }
 
+FONT_CANDIDATES = (
+    "arial.ttf",
+    "DejaVuSans.ttf",
+    "LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+)
+
+
+def _load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    for font_name in FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(font_name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
 
 def available_expression_names(expressions_dir: Path) -> list[str]:
     return sorted(path.stem for path in expressions_dir.glob("*.png")) or ["happy"]
@@ -851,10 +868,7 @@ def _speaker_bubble_text(sentence: str, speaker: str) -> str:
 
 def _draw_speech_bubble(frame: Image.Image, speaker_text: str, center_x: int, top_y: int) -> None:
     draw = ImageDraw.Draw(frame)
-    try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except Exception:
-        font = ImageFont.load_default()
+    font = _load_font(28)
     words = speaker_text
     if len(words) > 36:
         split_at = words.rfind(" ", 0, len(words) // 2 + 8)
@@ -888,10 +902,7 @@ def _draw_caption(frame: Image.Image, sentence: str) -> None:
         split_at = words.rfind(" ", 0, midpoint)
         if split_at > 20:
             words = words[:split_at] + "\n" + words[split_at + 1 :]
-    try:
-        font = ImageFont.truetype("arial.ttf", 100)
-    except Exception:
-        font = ImageFont.load_default()
+    font = _load_font(100)
     bbox = draw.multiline_textbbox((0, 0), words, font=font, align="center", spacing=12)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
