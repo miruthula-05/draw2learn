@@ -394,6 +394,12 @@ def _canvas_background_image(image_path: str, canvas_height: int) -> Image.Image
     return preview.resize((DISPLAY_WIDTH, canvas_height))
 
 
+def _canvas_display_height(image_path: str) -> int:
+    base_image = Image.open(image_path)
+    scale = DISPLAY_WIDTH / base_image.width
+    return int(base_image.height * scale)
+
+
 def _canvas_initial_expression(image_path: str, overlay_position: dict, expression_name: str) -> tuple[dict, int]:
     base_image = Image.open(image_path)
     scale = DISPLAY_WIDTH / base_image.width
@@ -547,7 +553,10 @@ def drawing_stage_page() -> None:
             st.session_state.overlay_positions.setdefault(active_object, DEFAULT_POSITION.copy()),
         )
         left_col, right_col = st.columns([1.2, 1])
-        initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
+        canvas_height = _canvas_display_height(image_path)
+        initial_drawing = st.session_state.canvas_drawings.get(active_object)
+        if not initial_drawing:
+            initial_drawing, canvas_height = _canvas_initial_expression(image_path, current_position, preview_expression)
         canvas_version = int(Path(image_path).stat().st_mtime)
 
         with left_col:
@@ -581,6 +590,7 @@ def drawing_stage_page() -> None:
 
             if st.button(f"Reset {active_object}", key=f"reset_{active_object}", width="stretch"):
                 st.session_state.overlay_positions[active_object] = DEFAULT_POSITION.copy()
+                st.session_state.canvas_drawings.pop(active_object, None)
                 st.session_state.pending_overlay_positions.pop(active_object, None)
                 st.rerun()
 
